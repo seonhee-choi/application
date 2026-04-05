@@ -1,0 +1,78 @@
+import java.text.SimpleDateFormat
+
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    environment {
+        GITHUB_AUTH = credentials('github')
+        REGISTRY_AUTH = credentials('registry')
+        VERSION     = getCurrentTime()
+    }
+    
+
+    stages {
+        stage('Git - Clone') {
+            steps {
+                git branch: 'main', 
+                credentialsId: 'github', 
+                url: 'https://github.com/kosaf1996/application.git'
+            }
+        }
+
+        stage('Docker Image Build') {
+            steps {
+                script {
+
+                    sh """
+                        cd demo
+                        docker build -t container-registry-adm.ncr.gov-ntruss.com/application:${VERSION} .
+                    """
+                }
+            }
+        }
+        stage('Docker Image Push') {
+            steps {
+                script {
+
+                    sh """
+                        echo $REGISTRY_AUTH_PSW | docker login container-registry-adm.ncr.gov-ntruss.com -u $REGISTRY_AUTH_USR --password-stdin
+                    """
+                    sh """
+                        docker push container-registry-adm.ncr.gov-ntruss.com/application:${VERSION}
+                    """
+                }
+            }
+        }
+
+        stage('Kustomize Update') {
+            steps {
+                script {
+                        git branch: 'main',
+                        credentialsId: 'github', 
+                        url: 'https://$GITHUB_AUTH_USR:$GITHUB_AUTH_PSW@github.com/kosaf1996/nks-kustomize-argo.git'
+                        sh """
+                            cd kustomize/application/overlays/
+                            sed -i -E "s/newTag:\\s.+/newTag: '${VERSION}'/g" kustomization.yaml
+                            git add kustomization.yaml
+                            git config --global user.email "kosaf1996@naver.com" 
+                            git config --global user.name "kosaf1996" 
+                            git commit -m 'chore: Jenkins update application:${VERSION}' || true
+                            git push https://$GITHUB_AUTH_USR:$GITHUB_AUTH_PSW@github.com/kosaf1996/nks-kustomize-argo.git
+                        """
+
+                }
+            }
+        }
+    }
+}
+
+def getCurrentTime() {
+    def date = new Date()
+    def dateFormat = new SimpleDateFormat("yyMMddHHmmss")
+    return dateFormat.format(date)
+}
