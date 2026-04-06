@@ -13,7 +13,7 @@ RUN gradle build -x test --parallel
 #RUN gradle build -x test --parallel --no-daemon --stacktrace
 
 # APP
-FROM openjdk:17.0-slim
+FROM openjdk:17-jdk-slim
 
 WORKDIR /app
 
