@@ -13,7 +13,7 @@ RUN gradle build -x test --parallel
 #RUN gradle build -x test --parallel --no-daemon --stacktrace
 
 # APP
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
